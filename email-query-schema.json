@@ -1,0 +1,50 @@
+{
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "[Branch]": {
+                "type": "string"
+            },
+            "[Patient Name]": {
+                "type": "string"
+            },
+            "[MR No.]": {
+                "type": "string"
+            },
+            "[Payor Source]": {
+                "type": "string"
+            },
+            "[SOC Date]": {
+                "type": "string"
+            },
+            "[Visit Completed]": {
+                "type": "string"
+            },
+            "[Visit Status]": {
+                "type": "string"
+            },
+            "[Due Date]": {
+                "type": "string"
+            },
+            "[Days]": {
+                "type": "integer"
+            },
+            "[Due]": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "[Branch]",
+            "[Patient Name]",
+            "[MR No.]",
+            "[Payor Source]",
+            "[SOC Date]",
+            "[Visit Completed]",
+            "[Visit Status]",
+            "[Due Date]",
+            "[Days]",
+            "[Due]"
+        ]
+    }
+}

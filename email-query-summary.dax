@@ -1,0 +1,11 @@
+EVALUATE
+SUMMARIZECOLUMNS(
+"# Cases", COALESCE([# Cases], 0),
+"Overdue", COALESCE([Overdue], 0),
+"Due Today", COALESCE([Today], 0),
+"Due in 1 Day", COALESCE([Due in 1 Day], 0),
+"Due in 2 Days", COALESCE([Due in 2 Days], 0),
+"Due in 3 Days", COALESCE([Due in 3 Days], 0)
+)
+ORDER BY
+[# Cases] DESC

@@ -1,0 +1,34 @@
+{
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "[# Cases]": {
+                "type": "integer"
+            },
+            "[Overdue]": {
+                "type": "integer"
+            },
+            "[Due Today]": {
+                "type": "integer"
+            },
+            "[Due in 1 Day]": {
+                "type": "integer"
+            },
+            "[Due in 2 Days]": {
+                "type": "integer"
+            },
+            "[Due in 3 Days]": {
+                "type": "integer"
+            }
+        },
+        "required": [
+            "[# Cases]",
+            "[Overdue]",
+            "[Due Today]",
+            "[Due in 1 Day]",
+            "[Due in 2 Days]",
+            "[Due in 3 Days]"
+        ]
+    }
+}
