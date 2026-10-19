@@ -1,38 +1,19 @@
-/* START QUERY BUILDER */
-EVALUATE
-SUMMARIZECOLUMNS(
-    'DataBricks-NOAQuery'[Branch Code],
-    'DataBricks-NOAQuery'[Patient Name],
-    'DataBricks-NOAQuery'[MR No.],
-    'DataBricks-NOAQuery'[Payor Source],
-    'DataBricks-NOAQuery'[SOC Date],
-    'DataBricks-NOAQuery'[SOC Visit Completed],
-    'DataBricks-NOAQuery'[SOC Visit Status],
-    'DataBricks-NOAQuery'[Due Date],
-    'DataBricks-NOAQuery'[Adjusted Days Remaining],
-    'DataBricks-NOAQuery'[__Bucket]
-)
-ORDER BY 
-    'DataBricks-NOAQuery'[Due Date] DESC
-/* END QUERY BUILDER */
-
-New version con alias:
-
 EVALUATE
 SELECTCOLUMNS(
-    'DataBricks-NOAQuery',
-        "Branch",           'DataBricks-NOAQuery'[Branch Code],
-        "Patient Name",     'DataBricks-NOAQuery'[Patient Name],
-        "MR No.",           'DataBricks-NOAQuery'[MR No.],
-        "Payor Source",     'DataBricks-NOAQuery'[Payor Source],
-        "SOC Date",         'DataBricks-NOAQuery'[SOC Date],
-        "Visit Completed",  'DataBricks-NOAQuery'[SOC Visit Completed],
-        "Visit Status",     'DataBricks-NOAQuery'[SOC Visit Status],
-        "Due Date",         'DataBricks-NOAQuery'[Due Date],
-        "Days",             'DataBricks-NOAQuery'[Adjusted Days Remaining],
-        "Due",              'DataBricks-NOAQuery'[__Bucket]
+    'pvw_ops_hh_noticeofadmission',
+        "Branch",           'pvw_ops_hh_noticeofadmission'[Branch Code],
+        "Patient Name",     'pvw_ops_hh_noticeofadmission'[Patient Name],
+        "MR No.",           'pvw_ops_hh_noticeofadmission'[MR No.],
+        "Payor Source",     'pvw_ops_hh_noticeofadmission'[Payor Source],
+        "SOC Date",         'pvw_ops_hh_noticeofadmission'[SOC Date],
+        "Visit Completed",  'pvw_ops_hh_noticeofadmission'[SOC Visit Completed],
+        "Visit Status",     'pvw_ops_hh_noticeofadmission'[SOC Visit Status],
+        "Due Date",         'pvw_ops_hh_noticeofadmission'[Due Date],
+        "Days",             'pvw_ops_hh_noticeofadmission'[Adjusted Days Remaining],
+        "Due",              'pvw_ops_hh_noticeofadmission'[Bucket]
 )
 ORDER BY 
     [Days] ASC,
+    [Due Date] ASC,
     [Branch] ASC,
     [Patient Name] ASC

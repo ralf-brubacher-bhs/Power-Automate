@@ -3,7 +3,7 @@ TOPN(
     15,
     SELECTCOLUMNS(
         SUMMARIZECOLUMNS(
-            'DataBricks-NOAQuery'[Branch Code],
+            'pvw_ops_hh_noticeofadmission'[Branch Code],
             "# Cases", COALESCE([# Cases], 0),
             "Overdue", COALESCE([Overdue], 0),
             "Due Today", COALESCE([Today], 0),
