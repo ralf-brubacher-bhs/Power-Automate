@@ -18,5 +18,6 @@ SELECTCOLUMNS(
     "Due in 3 Days", COALESCE([Due in 3 Days], 0)
 )
 ORDER BY
-    [# Cases] DESC,
+    [Overdue] DESC,
+    [Due Today] DESC,
     [Branch] ASC
