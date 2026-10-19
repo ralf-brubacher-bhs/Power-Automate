@@ -10,12 +10,13 @@ SELECTCOLUMNS(
         "Due in 3 Days", COALESCE([Due in 3 Days], 0)
     ),
     "Branch", [Branch Code],
-    "# Cases", [# Cases],
-    "Overdue", [Overdue],
-    "Today", [Today],
-    "Due in 1 Day", [Due in 1 Day],
-    "Due in 2 Days", [Due in 2 Days],
-    "Due in 3 Days", [Due in 3 Days]
+    "# Cases", COALESCE([# Cases], 0),
+    "Overdue", COALESCE([Overdue], 0),
+    "Due Today", COALESCE([Today], 0),
+    "Due in 1 Day", COALESCE([Due in 1 Day], 0),
+    "Due in 2 Days", COALESCE([Due in 2 Days], 0),
+    "Due in 3 Days", COALESCE([Due in 3 Days], 0)
 )
 ORDER BY
-    [# Cases] DESC
+    [# Cases] DESC,
+    [Branch] ASC
