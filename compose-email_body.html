@@ -23,6 +23,20 @@
         white-space: nowrap;
     }
 
+    .powerbi-button {
+        display: inline-block;
+        background-color: #3E6EA5;
+        color: #FFFFFF;
+        font-family: "Segoe UI", Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        padding: 8px 16px;
+        border: 1px solid #A7B4C4;
+        border-radius: 4px;
+        line-height: 1.4;
+        text-align: center;
+    }
 </style>
 
 <p>
@@ -68,45 +82,31 @@
     </li>
 </ul>
 
-<p style="margin-top: 20px; margin-bottom: 8px;">
-    You may check all details on the Power Bi Report
-</p>
-
-<table cellpadding=0 cellspacing=0 align=left>
- <tr>
-  <td width=6 height=4></td>
- </tr>
- <tr>
-  <td></td>
-  <td bgcolor="#3E6EA5" width="327" height="57" align="center" valign="middle"
-      style="background-color:#3E6EA5;width:327px;height:57px;">
-   <a href="https://app.powerbi.com/groups/1dc83e5b-4ed9-4d38-92fe-d274418346c6/reports/86707b5d-e128-4e46-898b-634c448786d4/2481c281886e0138da3e?experience=power-bi"
-      target="_blank"
-      style="display:block;width:327px;height:57px;line-height:57px;background-color:#3E6EA5;color:#FFFFFF;text-align:center;text-decoration:none;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:600;">
-    Open Power Bi Report
-   </a>
-  </td>
- </tr>
+<table cellpadding="0" cellspacing="0" align="left">
+    <tr>
+        <td bgcolor="#3E6EA5" width="327" height="57" align="center" valign="middle">
+            <a href="https://app.powerbi.com/groups/1dc83e5b-4ed9-4d38-92fe-d274418346c6/reports/86707b5d-e128-4e46-898b-634c448786d4/2481c281886e0138da3e?experience=power-bi"
+                target="_blank"
+                style="display:block;width:327px;height:57px;line-height:57px;background-color:#3E6EA5;color:#FFFFFF;text-align:center;text-decoration:none;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:600;">
+                Open Power BI Report
+            </a>
+        </td>
+    </tr>
 </table>
 
 <h3>
     Summary
 </h3>
-@{body('Create_HTML_table-Cases_summary')}
+@{outputs('Compose_Summary_Table')}
 
-<h3>
-    NOA's Detail
-</h3>
-@{body('Create_HTML_table-NOA_Result')}
+<h3>All Branches by # Cases</h3>
 
-<h3>
-    TOP 15 Branches by # Cases
-</h3>
 @{body('Create_HTML_table-Cases_by_Branch')}
 
-
 <br>
+
 <p>
-    Best regards,<br><br>
+    Best regards,
+    <br><br>
     Revenue Cycle - BrightSpring Health Services
 </p>
