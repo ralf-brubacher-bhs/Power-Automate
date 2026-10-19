@@ -24,7 +24,7 @@ function main(
         r["[Visit Status]"] ?? "",
         r["[Due Date]"] ?? "",
         toNumber(r["[Days]"]),
-        toNumber(r["[Due]"])          // numeric, so the formatting rules can compare it
+        r["[Due]"] ?? ""             // keep as text; schema defines it as a string like "PENALTY UP TO 7%"
 
     ]);
 
