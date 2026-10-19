@@ -18,7 +18,7 @@ function main(
         r["[Visit Status]"],
         r["[Due Date]"],
         Number(r["[Days]"]),
-        r["[Due]"]
+        r["[Due]"] ?? ""
 
     ]);
 
