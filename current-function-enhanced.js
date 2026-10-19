@@ -65,9 +65,15 @@ function applyDueFormatting(
     dueColumnName: string,
     scope: "cell" | "row"
 ): void {
-    const column = table.getColumns().find(
-        c => c.getName().trim().toLowerCase() === dueColumnName.trim().toLowerCase()
-    );
+    let column: ExcelScript.TableColumn | undefined;
+    const columns = table.getColumns();
+    for (let i = 0; i < columns.length; i++) {
+        const c = columns[i];
+        if (c.getName().trim().toLowerCase() === dueColumnName.trim().toLowerCase()) {
+            column = c;
+            break;
+        }
+    }
     if (!column) {
         throw new Error(`Column '${dueColumnName}' not found in table '${table.getName()}'.`);
     }
