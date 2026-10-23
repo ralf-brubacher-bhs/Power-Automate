@@ -1,315 +1,315 @@
-# Power Automate para reportes de Power BI por correo
+# Power Automate for emailing Power BI reports
 
-Documentación de referencia para construir, operar y gobernar los flujos de Power Automate que toman datos de Power BI y los envían por correo, en el contexto de una empresa de salud.
+Reference documentation for building, operating, and governing Power Automate flows that retrieve data from Power BI and send it by email in a healthcare organization.
 
-- **Fuentes:** Microsoft Learn, consultado el 2026-10-22 (lista al final). Lo que **no** está en la documentación oficial va marcado como **[inferido]** o **[verificar]**.
-- **Complementa** a [power-bi-url-and-png-power-automate.md](power-bi-url-and-png-power-automate.md). Allí están el detalle de la URL del reporte, los parámetros de *Export To File*, la sintaxis de filtros y las tres formas de incrustar la imagen en Outlook. Este documento no lo repite: remite a esas secciones.
+- **Sources:** Microsoft Learn, consulted on 2026-10-22 (listed at the end). Information **not** found in official documentation is marked **[inferred]** or **[verify]**.
+- **Complements** [power-bi-url-and-png-power-automate.md](power-bi-url-and-png-power-automate.md). That guide covers report URLs, *Export To File* parameters, filter syntax, and three ways to embed an image in Outlook. This document does not repeat that material; it refers to those sections.
 
 ---
 
-## 1. Qué patrón elegir
+## 1. Choosing a pattern
 
-Hay cuatro formas de llevar datos de Power BI a un correo. Conviene decidir primero cuál corresponde a cada reporte.
+There are four ways to bring Power BI data into an email. First decide which one fits each report.
 
-| Patrón | Qué recibe el destinatario | Cuándo usarlo | Requisito clave |
+| Pattern | What the recipient receives | When to use it | Key requirement |
 |---|---|---|---|
-| **A. Suscripción nativa de Power BI** (sin Power Automate) | Imagen de la página y enlace, o adjunto | Envíos simples, destinatarios internos, sin lógica | Ver límites en §8 |
-| **B. Exportar el reporte** (*Export To File for Power BI Reports*) | PNG, PDF o PPTX | Se necesita la imagen o el PDF del tablero, con filtros o RLS por destinatario | Capacidad Premium, Fabric o Embedded (no PPU). Detalle en la guía PNG |
-| **C. Consultar el modelo** (*Run a query against a dataset*, DAX) | Tabla HTML con los números en el cuerpo | Indicadores puntuales, alertas, texto que se lee bien en cualquier cliente de correo | Funciona en Pro, PPU y Premium |
-| **D. Reporte paginado** (*Export To File for Paginated Reports*) | PDF, XLSX, DOCX, CSV, etc. | Listados operativos largos o con formato de impresión | Capacidad Premium o Fabric **[verificar]** según el tipo de workspace |
+| **A. Native Power BI subscription** (without Power Automate) | Page image and link, or an attachment | Simple, internal-recipient emails with no logic | See limits in §8 |
+| **B. Export the report** (*Export To File for Power BI Reports*) | PNG, PDF, or PPTX | The recipient needs an image or PDF of the dashboard, with filters or recipient-specific RLS | Premium, Fabric, or Embedded capacity (not PPU). See the PNG guide |
+| **C. Query the model** (*Run a query against a dataset*, DAX) | HTML table with values in the email body | Specific metrics, alerts, or content that displays well in any email client | Works with Pro, PPU, and Premium |
+| **D. Paginated report** (*Export To File for Paginated Reports*) | PDF, XLSX, DOCX, CSV, etc. | Long operational lists or print-formatted output | Premium or Fabric capacity **[verify]**, depending on the workspace type |
 
-**Recomendación para salud [inferido]:** usar **C** para indicadores agregados en el cuerpo del correo (no depende de cómo Outlook muestre imágenes y no viaja ningún archivo), **B** cuando el destinatario necesita ver el tablero, y **A** solo si no hace falta ninguna lógica. En todos los casos, enviar indicadores agregados y no datos identificables de pacientes (ver §7.6).
+**Healthcare recommendation [inferred]:** use **C** for aggregated metrics in the email body (it does not depend on how Outlook displays images and sends no file), **B** when the recipient needs to see the dashboard, and **A** only when no logic is needed. In all cases, send aggregated metrics rather than identifiable patient data (see §7.6).
 
 ---
 
-## 2. El conector de Power BI
+## 2. The Power BI connector
 
-Fuente: [Conector Power BI](https://learn.microsoft.com/connectors/powerbi/).
+Source: [Power BI connector](https://learn.microsoft.com/connectors/powerbi/).
 
-### 2.1 Características generales
+### 2.1 General characteristics
 
-- **Clase: Standard** en Power Automate. No requiere licencia Premium de Power Automate.
-- **Autenticación:** solo OAuth del usuario que inicia sesión. La conexión **no se puede compartir**: cada flujo usa la identidad de la persona que creó la conexión. No hay opción de entidad de servicio (*service principal*) en este conector.
-- **Throttling:** **100 llamadas por conexión cada 60 segundos**.
-- **No funciona** en las nubes soberanas de Power BI (China, Alemania, US Government).
+- **Class: Standard** in Power Automate. It does not require a Power Automate Premium license.
+- **Authentication:** OAuth only, using the signed-in user. The connection **cannot be shared**: each flow uses the identity of the person who created the connection. This connector does not support a *service principal*.
+- **Throttling:** **100 calls per connection every 60 seconds**.
+- **Does not work** in Power BI sovereign clouds (China, Germany, and US Government).
 
-### 2.2 Acciones útiles para reportes por correo
+### 2.2 Useful actions for emailing reports
 
-| Acción | Para qué sirve | Notas |
+| Action | What it does | Notes |
 |---|---|---|
-| **Export To File for Power BI Reports** | Exporta un reporte a PNG, PDF o PPTX | Admite página, visual, marcador, filtro, configuración regional e identidades RLS. Ver la guía PNG, §2 a §5 |
-| **Export To File for Paginated Reports** | Exporta un reporte paginado | Formatos: PPTX, PDF, ACCESSIBLEPDF, XLSX, DOCX, CSV, XML, MHTML e imagen (BMP, EMF, GIF, JPEG, PNG, TIFF). Acepta parámetros del reporte |
-| **Run a query against a dataset** | Ejecuta una consulta **DAX** y devuelve filas en JSON (`firstTableRows`) | Parámetros: workspace, modelo, consulta, *Nulls included*, *Impersonate user* (UPN, para RLS) |
-| **Run a json query against a dataset** | La misma API con el cuerpo JSON completo | Para quien ya tiene el cuerpo de la API REST |
-| **Refresh a dataset** | Pide una actualización del modelo semántico | Ver §4.3: no espera a que la actualización termine **[inferido]** |
-| **Add rows to a dataset** | Inserta filas en un modelo *push* | La transmisión en tiempo real de Power BI está anunciada para retiro; no usarla en diseños nuevos |
+| **Export To File for Power BI Reports** | Exports a report to PNG, PDF, or PPTX | Supports pages, visuals, bookmarks, filters, locale, and RLS identities. See PNG guide, §§2–5 |
+| **Export To File for Paginated Reports** | Exports a paginated report | Formats: PPTX, PDF, ACCESSIBLEPDF, XLSX, DOCX, CSV, XML, MHTML, and images (BMP, EMF, GIF, JPEG, PNG, TIFF). Accepts report parameters |
+| **Run a query against a dataset** | Runs a **DAX** query and returns rows as JSON (`firstTableRows`) | Parameters: workspace, model, query, *Nulls included*, *Impersonate user* (UPN, for RLS) |
+| **Run a json query against a dataset** | Uses the same API with the complete JSON body | For users who already have the REST API body |
+| **Refresh a dataset** | Requests a semantic model refresh | See §4.3: it does not wait for the refresh to finish **[inferred]** |
+| **Add rows to a dataset** | Inserts rows into a *push* model | Power BI real-time streaming is announced for retirement; do not use it in new designs |
 
-### 2.3 Desencadenadores (triggers)
+### 2.3 Triggers
 
-| Trigger | Uso |
+| Trigger | Use |
 |---|---|
-| **When a data driven alert is triggered** | Arranca el flujo cuando salta una alerta de datos configurada en un **icono de dashboard** de Power BI (no en un reporte). Devuelve título, umbral, valor e URL del icono |
-| Triggers de **metas/scorecards** (*Preview*) | Cambio de estado o valor de una meta. Sondeo mínimo cada 300 s. En vista previa: no usarlos en producción |
+| **When a data driven alert is triggered** | Starts the flow when a data alert configured on a Power BI **dashboard tile** (not a report) is triggered. Returns the tile title, threshold, value, and URL |
+| **Goals/scorecards** triggers (*Preview*) | A goal's status or value changes. Minimum polling interval is 300 seconds. While in preview, do not use in production |
 
-Para envíos periódicos el trigger es **Recurrence** (§4), no uno del conector.
+For scheduled emails, use the **Recurrence** trigger (§4), not a trigger from the connector.
 
-### 2.4 Consulta DAX desde el flujo (patrón C)
+### 2.4 DAX queries from a flow (pattern C)
 
-La acción usa la API REST *Datasets - Execute Queries*. Límites oficiales ([referencia](https://learn.microsoft.com/rest/api/power-bi/datasets/execute-queries)):
+The action uses the REST API *Datasets - Execute Queries*. Official limits ([reference](https://learn.microsoft.com/rest/api/power-bi/datasets/execute-queries)):
 
-- El administrador debe tener activada la opción de tenant **Dataset Execute Queries REST API**.
-- El usuario de la conexión necesita permisos de **Read y Build** sobre el modelo.
-- Una consulta por llamada y **una tabla** por consulta.
-- Máximo **100.000 filas o 1.000.000 de valores** (lo que ocurra primero) y **15 MB** por consulta. Si se supera, la respuesta es **HTTP 200 con datos truncados**, no un error. Conviene validar el número de filas.
-- **120 consultas por minuto por usuario**, sea cual sea el modelo.
-- Solo DAX (no MDX, DMV ni funciones INFO). No admite modelos en Azure Analysis Services.
-- Con **RLS**, `impersonatedUserName` permite ejecutar la consulta como otro usuario y obtener solo sus filas. Las entidades de servicio no son compatibles con modelos que tienen RLS o SSO.
+- The administrator must enable the **Dataset Execute Queries REST API** tenant setting.
+- The connection user needs **Read** and **Build** permissions on the model.
+- One query per call and **one table** per query.
+- Maximum of **100,000 rows or 1,000,000 values** (whichever comes first) and **15 MB** per query. If the limit is exceeded, the response is **HTTP 200 with truncated data**, not an error. Validate the row count.
+- **120 queries per minute per user**, regardless of the model.
+- DAX only (not MDX, DMV, or INFO functions). Azure Analysis Services models are not supported.
+- With **RLS**, `impersonatedUserName` lets the query run as another user and return only that user's rows. Service principals are not supported for models with RLS or SSO.
 
-Ejemplo de consulta para un correo de indicadores diarios (los nombres de tabla y medida son ilustrativos):
+Example query for an email with daily metrics (table and measure names are illustrative):
 
 ```dax
 EVALUATE
 SUMMARIZECOLUMNS(
-    Sedes[Sede],
-    "Turnos",          [Total Turnos],
-    "Ausentismo %",    ROUND([Tasa Ausentismo] * 100, 1),
-    "Espera media min",ROUND([Espera Media Minutos], 0)
+    Locations[Location],
+    "Shifts",              [Total Shifts],
+    "Absenteeism %",       ROUND([Absenteeism Rate] * 100, 1),
+    "Average Wait (min)",  ROUND([Average Wait Minutes], 0)
 )
-ORDER BY Sedes[Sede]
+ORDER BY Locations[Location]
 ```
 
-Microsoft recomienda devolver solo las columnas necesarias, preferir `SUMMARIZECOLUMNS` y limitar filas con `TOPN` ([buenas prácticas DAX por API](https://learn.microsoft.com/power-bi/developer/execute-dax-queries-arrow/best-practices)).
+Microsoft recommends returning only the required columns, preferring `SUMMARIZECOLUMNS`, and limiting rows with `TOPN` ([DAX query best practices](https://learn.microsoft.com/power-bi/developer/execute-dax-queries-arrow/best-practices)).
 
-Las claves del JSON vienen como `Sedes[Sede]` o `[Turnos]`. Para armar la tabla del correo use **Select** para renombrarlas y luego **Create HTML table**:
+JSON keys are returned as `Locations[Location]` or `[Shifts]`. To build the email table, use **Select** to rename them, followed by **Create HTML table**:
 
 ```
 Select
   From: @{outputs('Run_a_query_against_a_dataset')?['body/firstTableRows']}
-  Map:  Sede        -> @{item()?['Sedes[Sede]']}
-        Turnos      -> @{item()?['[Turnos]']}
-        Ausentismo  -> @{item()?['[Ausentismo %]']}
+  Map:  Location       -> @{item()?['Locations[Location]']}
+        Shifts         -> @{item()?['[Shifts]']}
+        Absenteeism    -> @{item()?['[Absenteeism %]']}
 ```
 
-**[inferido]** *Create HTML table* genera un `<table>` sin estilos. Outlook clásico de Windows (motor de Word) ignora el CSS en `<style>` de forma irregular. Para un resultado estable, arme la tabla con estilos en línea (por ejemplo con `replace()` sobre el HTML generado o construyendo las filas con *Select* + `join()`), con el criterio de maquetación de la guía PNG, §4. El comportamiento de Outlook con HTML se tratará en detalle en una guía aparte.
+**[Inferred]** *Create HTML table* generates a `<table>` without styles. Classic Outlook for Windows (the Word rendering engine) handles CSS in `<style>` inconsistently. For a stable result, build the table with inline styles (for example, use `replace()` on the generated HTML or build rows with *Select* + `join()`), following the layout guidance in the PNG guide, §4. Outlook's HTML behavior will be covered in detail in a separate guide.
 
 ---
 
-## 3. Exportación a archivo (patrón B y D)
+## 3. Exporting to a file (patterns B and D)
 
-Todo lo relativo a PNG, la URL, `pageName`, filtros, marcadores, RLS, límites de la exportación y cómo incrustar la imagen está en la guía PNG. Resumen de lo que afecta al diseño del flujo:
+The PNG guide covers everything related to PNG, URLs, `pageName`, filters, bookmarks, RLS, export limits, and embedding the image. Here is a summary of the points that affect flow design:
 
-- La exportación es **asíncrona**. El conector espera internamente y devuelve el archivo. Microsoft no publica cuánto espera la acción antes de fallar **[verificar]**. Configure una política de reintentos (§6).
-- Una página da un archivo. Varias páginas en PNG dan un **.zip**.
-- Cuenta como operación de fondo en la capacidad y consume unidades de capacidad (CU). Programe los envíos masivos fuera de las horas de uso intenso **[inferido]**.
-- El PNG **pierde la etiqueta de confidencialidad**. PDF y PPTX la conservan.
+- Export is **asynchronous**. The connector waits internally and returns the file. Microsoft does not publish how long the action waits before failing **[verify]**. Configure a retry policy (§6).
+- One page produces one file. Multiple pages exported to PNG produce a **.zip** file.
+- Export counts as a background operation against capacity and consumes capacity units (CUs). Schedule bulk emails outside peak usage hours **[inferred]**.
+- PNG **loses the sensitivity label**. PDF and PPTX retain it.
 
 ---
 
-## 4. Programación
+## 4. Scheduling
 
-Fuente: [Run a cloud flow on a schedule](https://learn.microsoft.com/power-automate/run-scheduled-tasks).
+Source: [Run a cloud flow on a schedule](https://learn.microsoft.com/power-automate/run-scheduled-tasks).
 
-### 4.1 Trigger Recurrence
+### 4.1 Recurrence trigger
 
-- Configure **siempre** la **zona horaria** y la **hora de inicio** (formato `YYYY-MM-DDTHH:MM:SSZ`). Si no se fija la hora de inicio, el flujo puede ejecutarse antes de lo previsto ([solución de problemas de triggers](https://learn.microsoft.com/troubleshoot/power-platform/power-automate/flow-run-issues/triggers-troubleshoot)).
-- Con una zona horaria local (por ejemplo *(UTC-03:00) Buenos Aires*), el horario sigue la hora local. Con UTC, hay que recalcularlo si el país cambia de horario **[inferido]**.
-- Use **On these days** y **At these hours / minutes** para fijar días hábiles y horas exactas.
-- Intervalo mínimo: **60 s**; máximo: **500 días**.
+- **Always** configure the **time zone** and **start time** (format `YYYY-MM-DDTHH:MM:SSZ`). If the start time is not set, the flow may run earlier than expected ([troubleshoot triggers](https://learn.microsoft.com/troubleshoot/power-platform/power-automate/flow-run-issues/triggers-troubleshoot)).
+- With a local time zone (for example, *(UTC-03:00) Buenos Aires*), the schedule follows local time. With UTC, it must be recalculated if the country changes its clocks **[inferred]**.
+- Use **On these days** and **At these hours / minutes** to set weekdays and exact times.
+- Minimum interval: **60 seconds**; maximum: **500 days**.
 
-### 4.2 Fechas en el contenido
+### 4.2 Dates in the email
 
-Las fechas en Power Automate suelen ir en UTC. Para el asunto y el cuerpo use **Convert time zone** o la expresión:
+Dates in Power Automate are usually in UTC. For the subject and body, use **Convert time zone** or this expression:
 
 ```
 convertTimeZone(utcNow(), 'UTC', 'Argentina Standard Time', 'dd/MM/yyyy')
 ```
 
-([Convertir zona horaria](https://learn.microsoft.com/power-automate/convert-time-zone)). El nombre de la zona sigue el formato de Windows **[verificar]** el que corresponda a su país.
+([Convert time zone](https://learn.microsoft.com/power-automate/convert-time-zone)). The time-zone name follows the Windows format; **[verify]** the correct one for your country.
 
-### 4.3 Enviar con datos actualizados
+### 4.3 Sending with up-to-date data
 
-- **Opción recomendada [inferido]:** dejar la actualización en la **programación del modelo** en Power BI y programar el flujo con margen después de la ventana de actualización. En capacidad compartida el límite es de 8 actualizaciones programadas por día; en Premium, PPU o Fabric, 48 ([Data refresh in Power BI](https://learn.microsoft.com/power-bi/connect-data/refresh-data)).
-- **Refresh a dataset** solo **pide** la actualización. La API es asíncrona, así que la acción termina antes que la actualización **[inferido]**. Para esperar el resultado habría que consultar `GET .../datasets/{id}/refreshes?$top=1` en un bucle *Do until*, lo que requiere un conector HTTP con Microsoft Entra ID. Ese conector es **Premium** **[verificar]** la licencia en su tenant.
-- Las actualizaciones lanzadas por API **no envían el correo de error** de Power BI. Si las usa, el flujo tiene que avisar del fallo.
-- Power BI **pausa la actualización programada** de un modelo si nadie visita sus reportes en dos meses. Si los usuarios solo consumen el correo exportado, puede ocurrir. Una suscripción nativa sobre el reporte evita la pausa ([refresh-data](https://learn.microsoft.com/power-bi/connect-data/refresh-data); [suscripciones](https://learn.microsoft.com/power-bi/collaborate-share/end-user-subscribe)).
+- **Recommended option [inferred]:** keep the refresh in the Power BI **model schedule** and schedule the flow with a buffer after the refresh window. Shared capacity allows up to 8 scheduled refreshes per day; Premium, PPU, or Fabric allows 48 ([Data refresh in Power BI](https://learn.microsoft.com/power-bi/connect-data/refresh-data)).
+- **Refresh a dataset** only **requests** the refresh. The API is asynchronous, so the action finishes before the refresh does **[inferred]**. To wait for the result, poll `GET .../datasets/{id}/refreshes?$top=1` in a *Do until* loop, which requires an HTTP with Microsoft Entra ID connector. That connector is **Premium**; **[verify]** the license in your tenant.
+- Refreshes started through the API **do not send Power BI's refresh-failure email**. If you use them, the flow must notify you of failures.
+- Power BI **pauses scheduled refresh** for a model if nobody visits its reports for two months. This can happen if users only consume the exported email. A native subscription to the report avoids the pause ([refresh data](https://learn.microsoft.com/power-bi/connect-data/refresh-data); [subscriptions](https://learn.microsoft.com/power-bi/collaborate-share/end-user-subscribe)).
 
-### 4.4 Disparo por alerta
+### 4.4 Triggering on an alert
 
-Para avisos por umbral (por ejemplo, ocupación de camas mayor que 90 %), configure una alerta de datos en un icono de dashboard y use el trigger *When a data driven alert is triggered*. Así evita sondear con *Recurrence*.
-
----
-
-## 5. Licencias y límites
-
-### 5.1 Licencias de Power Automate
-
-Fuentes: [Request limits and allocations](https://learn.microsoft.com/power-platform/admin/api-request-limits-allocations), [Limits and configuration](https://learn.microsoft.com/power-automate/limits-and-config), [Licensing FAQ](https://learn.microsoft.com/power-platform/admin/power-automate-licensing/faqs).
-
-- **Power BI** y **Office 365 Outlook** son conectores **Standard**: un flujo que solo usa estos conectores funciona con la licencia de **Microsoft 365** del propietario.
-- Necesita **Power Automate Premium** (por usuario) o **Process** (por flujo) si usa conectores Premium: HTTP, HTTP con Microsoft Entra ID, Dataverse, Azure Key Vault, etc.
-- Un flujo **usa la licencia de su propietario**. Si el propietario deja la organización, el flujo baja al perfil de rendimiento *Low*.
-
-**Solicitudes de Power Platform (PPR) por 24 h.** Cada trigger y cada acción cuentan como una solicitud, incluidas las que se ejecutan dentro de bucles, los reintentos y la paginación.
-
-| Licencia | Límite oficial | Límite en el período de transición actual |
-|---|---|---|
-| Microsoft 365 / Office 365 | 6.000 por usuario | 10.000 por flujo |
-| Power Automate Premium | 40.000 por usuario | 200.000 por flujo |
-| Power Automate Process | 250.000 por licencia (apilable hasta 10 en un flujo) | 500.000 por licencia |
-
-Además, todas las licencias tienen un límite de **100.000 solicitudes cada 5 minutos**.
-
-**Estimación [inferido]:** un envío diario con 1 trigger, 1 consulta, *Select*, *Create HTML table*, *Compose* y 1 correo son unas 6 solicitudes. Un bucle de 30 sedes con exportación y correo por sede son unas 100 solicitudes por ejecución. Las dos opciones caben con holgura en una licencia de Microsoft 365. Al escalar, el límite que se alcanza antes es el **throttling del conector**: 100 llamadas/min en Power BI y 300 llamadas/min en Outlook.
-
-### 5.2 Límites de la plataforma
-
-| Límite | Valor | Fuente |
-|---|---|---|
-| Duración de una ejecución | 30 días | limits-and-config |
-| Retención del historial de ejecuciones | 30 días | limits-and-config |
-| Solicitud saliente síncrona | 120 s (las acciones asíncronas pueden durar más) | limits-and-config |
-| Tamaño de mensaje | 100 MB (1 GB con fragmentación, si la acción la admite) | limits-and-config |
-| Acciones por flujo / anidamiento | 500 / 8 niveles | limits-and-config |
-| Caracteres por expresión | 8.192 | limits-and-config |
-| Flujos por usuario (fuera de soluciones) | 600 | limits-and-config |
-| Flujo con errores continuos | Se apaga a los **14 días** | limits-and-config |
-| Flujo sin ejecuciones | Puede apagarse a los **90 días** (no aplica con licencia Premium o Process; se avisa 30 días antes) | limits-and-config |
-| Flujo con throttling constante | Se apaga a los 14 días | limits-and-config |
-
-Los límites de Power BI (exportación, consultas) y de Exchange (35 MB por mensaje) están en §2.4 y en la guía PNG, §5.
+For threshold notifications (for example, bed occupancy above 90%), configure a data alert on a dashboard tile and use the *When a data driven alert is triggered* trigger. This avoids polling with *Recurrence*.
 
 ---
 
-## 6. Diseño robusto del flujo
+## 5. Licensing and limits
 
-Fuente: [Employ robust error handling](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/error-handling).
+### 5.1 Power Automate licensing
 
-### 6.1 Estructura recomendada
+Sources: [Request limits and allocations](https://learn.microsoft.com/power-platform/admin/api-request-limits-allocations), [Limits and configuration](https://learn.microsoft.com/power-automate/limits-and-config), [Licensing FAQ](https://learn.microsoft.com/power-platform/admin/power-automate-licensing/faqs).
+
+- **Power BI** and **Office 365 Outlook** are **Standard** connectors: a flow that uses only these connectors works with the owner's **Microsoft 365** license.
+- You need **Power Automate Premium** (per user) or **Process** (per flow) if you use Premium connectors such as HTTP, HTTP with Microsoft Entra ID, Dataverse, or Azure Key Vault.
+- A flow **uses its owner's license**. If the owner leaves the organization, the flow falls back to the *Low* performance profile.
+
+**Power Platform requests (PPRs) per 24 hours.** Each trigger and action counts as a request, including those running inside loops, retries, and pagination.
+
+| License | Official limit | Limit during the current transition period |
+|---|---|---|
+| Microsoft 365 / Office 365 | 6,000 per user | 10,000 per flow |
+| Power Automate Premium | 40,000 per user | 200,000 per flow |
+| Power Automate Process | 250,000 per license (stackable up to 10 in a flow) | 500,000 per license |
+
+All licenses also have a limit of **100,000 requests every 5 minutes**.
+
+**Estimate [inferred]:** a daily email with 1 trigger, 1 query, *Select*, *Create HTML table*, *Compose*, and 1 email uses about 6 requests. A loop through 30 locations with one export and email per location uses about 100 requests per run. Both options fit comfortably within a Microsoft 365 license. At scale, the limit reached first is the **connector throttle**: 100 calls/minute in Power BI and 300 calls/minute in Outlook.
+
+### 5.2 Platform limits
+
+| Limit | Value | Source |
+|---|---|---|
+| Run duration | 30 days | limits-and-config |
+| Run history retention | 30 days | limits-and-config |
+| Synchronous outbound request | 120 seconds (asynchronous actions can take longer) | limits-and-config |
+| Message size | 100 MB (1 GB with chunking, if supported by the action) | limits-and-config |
+| Actions per flow / nesting | 500 / 8 levels | limits-and-config |
+| Characters per expression | 8,192 | limits-and-config |
+| Flows per user (outside solutions) | 600 | limits-and-config |
+| Flow with continuous errors | Turned off after **14 days** | limits-and-config |
+| Flow with no runs | May be turned off after **90 days** (does not apply with a Premium or Process license; notice is sent 30 days beforehand) | limits-and-config |
+| Flow with continuous throttling | Turned off after 14 days | limits-and-config |
+
+Power BI limits (exports and queries) and Exchange limits (35 MB per message) are covered in §2.4 and in the PNG guide, §5.
+
+---
+
+## 6. Robust flow design
+
+Source: [Employ robust error handling](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/error-handling).
+
+### 6.1 Recommended structure
 
 ```
-Recurrence  (zona horaria + hora de inicio)
-├─ Initialize variables / Compose de configuración   ← lee variables de entorno
+Recurrence  (time zone + start time)
+├─ Initialize variables / Compose configuration   ← reads environment variables
 ├─ Scope "Try"
-│   ├─ Power BI · Run a query against a dataset       (o Export To File)
-│   ├─ Select + Create HTML table / Compose del cuerpo
+│   ├─ Power BI · Run a query against a dataset    (or Export To File)
+│   ├─ Select + Create HTML table / Compose body
 │   └─ Office 365 Outlook · Send an email from a shared mailbox (V2)
 ├─ Scope "Catch"   (Configure run after: has failed, has timed out)
-│   ├─ Filter array sobre result('Try')  → error real
-│   ├─ Compose: URL de la ejecución (workflow())
-│   └─ Notificar al equipo de soporte (Teams o correo)
-└─ Scope "Finally" (opcional: registro en una lista o tabla)
+│   ├─ Filter array on result('Try')  → actual error
+│   ├─ Compose: run URL (workflow())
+│   └─ Notify the support team (Teams or email)
+└─ Scope "Finally" (optional: log to a list or table)
 ```
 
-### 6.2 Reglas
+### 6.2 Rules
 
-1. **Try/Catch con Scopes** y *Configure run after*. Ponga la notificación de error en el *Catch*, no en cada acción.
-2. **Política de reintentos exponencial** en las acciones de Power BI (exportación y consulta). Cada reintento cuenta como solicitud.
-3. **Enlace a la ejecución** en el aviso de error, construido con `workflow()`:
+1. Use **Try/Catch with Scopes** and *Configure run after*. Put error notifications in *Catch*, not in every action.
+2. Use an **exponential retry policy** for Power BI actions (export and query). Each retry counts as a request.
+3. Include a **link to the run** in the error notification, built with `workflow()`:
    `https://make.powerautomate.com/environments/@{workflow()?['tags']?['environmentName']}/flows/@{workflow()?['tags']?['logicAppName']}/runs/@{workflow()?['run']?['name']}`
-4. **Idempotencia.** Power Automate garantiza "al menos una vez", así que una acción puede ejecutarse dos veces y enviar correos duplicados ([triggers troubleshoot](https://learn.microsoft.com/troubleshoot/power-platform/power-automate/flow-run-issues/triggers-troubleshoot)). En envíos críticos, registre la clave `fecha + reporte + destinatario` antes de enviar y compruébela.
-5. **Validar los datos antes de enviar.** Si la consulta devuelve 0 filas, o justo el máximo (señal de truncado), no envíe y avise.
-6. **Para enviar a muchos destinatarios**, use *Apply to each* con el **control de simultaneidad** ajustado para no superar los límites del conector **[inferido]**: 100/min en Power BI y 300/min en Outlook.
-7. **Remitente:** use *Send an email from a shared mailbox (V2)* con un buzón institucional (p. ej. `reportes@…`), así las respuestas no llegan al buzón personal del propietario del flujo **[inferido]**.
+4. **Idempotency.** Power Automate provides "at least once" delivery, so an action may run twice and send duplicate emails ([troubleshoot triggers](https://learn.microsoft.com/troubleshoot/power-platform/power-automate/flow-run-issues/triggers-troubleshoot)). For critical emails, record and check the key `date + report + recipient` before sending.
+5. **Validate data before sending.** If the query returns 0 rows or exactly the maximum (a sign of truncation), do not send; notify someone.
+6. **For many recipients**, use *Apply to each* with the **concurrency control** set to avoid exceeding connector limits **[inferred]**: 100/minute for Power BI and 300/minute for Outlook.
+7. **Sender:** use *Send an email from a shared mailbox (V2)* with an institutional mailbox (e.g., `reports@…`) so replies do not go to the flow owner's personal mailbox **[inferred]**.
 
 ---
 
-## 7. Gobierno y seguridad
+## 7. Governance and security
 
-### 7.1 Entornos
+### 7.1 Environments
 
-- **No construya los flujos de producción en el entorno predeterminado** (*Default*): todos los empleados tienen acceso a él. Microsoft recomienda **entornos dedicados** para datos muy confidenciales ([Manage the default environment](https://learn.microsoft.com/power-platform/guidance/adoption/manage-default-environment)).
-- Separación mínima **[inferido]:** *Desarrollo* → *Producción* (y *Prueba* si hay más de un desarrollador).
-- Active **Managed Environments** en producción: límites de uso compartido, información de uso y recomendaciones de seguridad ([Secure the default environment](https://learn.microsoft.com/power-platform/guidance/adoption/secure-default-environment)). **[verificar]** Managed Environments requiere que los usuarios tengan licencias Premium.
-- **Región del entorno:** elija la región de datos que exija la normativa local al crear el entorno **[inferido]**.
+- **Do not build production flows in the default environment** (*Default*): all employees have access to it. Microsoft recommends **dedicated environments** for highly confidential data ([Manage the default environment](https://learn.microsoft.com/power-platform/guidance/adoption/manage-default-environment)).
+- Minimum separation **[inferred]:** *Development* → *Production* (and *Test* if there is more than one developer).
+- Enable **Managed Environments** in production: sharing limits, usage insights, and security recommendations ([Secure the default environment](https://learn.microsoft.com/power-platform/guidance/adoption/secure-default-environment)). **[Verify]** Managed Environments may require users to have Premium licenses.
+- **Environment region:** choose the data region required by local regulations when creating the environment **[inferred]**.
 
-### 7.2 Soluciones y ALM
+### 7.2 Solutions and ALM
 
-- Cree los flujos **dentro de una solución**. Es necesario para asignar licencias Process, para usar variables de entorno y para que el historial de ejecuciones se guarde en Dataverse.
-- **Connection references:** desacoplan la conexión del flujo. En cada entorno se asigna la conexión correspondiente sin editar el flujo ([Pre-populate connection references](https://learn.microsoft.com/power-platform/alm/conn-ref-env-variables-build-tools)).
-- **Variables de entorno** para todo lo que cambia entre entornos: IDs de workspace, reporte y modelo, listas de destinatarios, buzón remitente, canal de soporte ([Create environment variables](https://learn.microsoft.com/power-automate/environment-variables)). Limitación: si cambia el valor directamente en el entorno, el flujo sigue usando el valor anterior hasta que se guarde o se apague y encienda de nuevo.
-- Mueva el flujo entre entornos como **solución administrada** (*managed*), con Pipelines de Power Platform o Build Tools.
+- Create flows **inside a solution**. This is required to assign Process licenses, use environment variables, and store run history in Dataverse.
+- **Connection references** decouple the connection from the flow. Assign the appropriate connection in each environment without editing the flow ([Pre-populate connection references](https://learn.microsoft.com/power-platform/alm/conn-ref-env-variables-build-tools)).
+- Use **environment variables** for everything that changes between environments: workspace, report, and model IDs; recipient lists; sender mailbox; and support channel ([Create environment variables](https://learn.microsoft.com/power-automate/environment-variables)). Limitation: if the value is changed directly in the environment, the flow continues to use the old value until it is saved or turned off and on again.
+- Move the flow between environments as a **managed solution**, using Power Platform Pipelines or Build Tools.
 
-### 7.3 Identidad del flujo
+### 7.3 Flow identity
 
-- Como el conector de Power BI usa la identidad del usuario y no se comparte (§2.1), **[inferido]** use una **cuenta de servicio** dedicada (no personal) con estas condiciones:
-  - licencia que cubra Power Automate y acceso de lectura al workspace;
-  - permiso **Build** en el modelo si usa consultas DAX;
-  - rol **Contributor** en el workspace si exporta con identidades RLS (guía PNG, §2);
-  - MFA y acceso condicional según la política de la organización. **[verificar]** que no interrumpan la renovación del token de la conexión.
-- Agregue **copropietarios** (un grupo de seguridad) para que el flujo no quede huérfano.
+- Because the Power BI connector uses the user's identity and cannot be shared (§2.1), **[inferred]** use a dedicated, non-personal **service account** with the following:
+  - a license that covers Power Automate and read access to the workspace;
+  - **Build** permission on the model if using DAX queries;
+  - **Contributor** role in the workspace if exporting with RLS identities (PNG guide, §2);
+  - MFA and conditional access according to organizational policy. **[Verify]** that these do not interrupt connection token renewal.
+- Add **co-owners** (a security group) so the flow is not orphaned.
 
-### 7.4 Políticas de datos (DLP)
+### 7.4 Data loss prevention (DLP) policies
 
-Fuentes: [Data policy strategy](https://learn.microsoft.com/power-platform/guidance/adoption/dlp-strategy), [Connector classification](https://learn.microsoft.com/power-platform/admin/dlp-connector-classification).
+Sources: [Data policy strategy](https://learn.microsoft.com/power-platform/guidance/adoption/dlp-strategy), [Connector classification](https://learn.microsoft.com/power-platform/admin/dlp-connector-classification).
 
-- Coloque **Power BI**, **Office 365 Outlook**, **SharePoint**, **Teams** y **Dataverse** en el grupo **Business**. Un flujo no puede combinar conectores *Business* con *Non-business*.
-- **Bloquee** en el entorno de producción los conectores de consumo (Gmail, Dropbox, redes sociales, etc.) para que los datos de salud no salgan por ellos. Los conectores Standard de Microsoft no se pueden bloquear, solo clasificar.
-- **Cuidado con los conectores HTTP:** si los bloquea, también deja de funcionar *Run a Child Flow*, que depende de ellos internamente.
-- Un flujo que infringe la política se guarda pero queda **suspendido**.
-- Las **Advanced connector policies** (lista de permitidos, todo bloqueado por defecto) son la evolución del modelo. Por ahora solo cubren conectores certificados.
+- Place **Power BI**, **Office 365 Outlook**, **SharePoint**, **Teams**, and **Dataverse** in the **Business** group. A flow cannot combine *Business* and *Non-business* connectors.
+- **Block** consumer connectors (Gmail, Dropbox, social networks, etc.) in the production environment to prevent healthcare data from leaving through them. Microsoft Standard connectors cannot be blocked, only classified.
+- **Be careful with HTTP connectors:** blocking them also breaks *Run a Child Flow*, which depends on them internally.
+- A flow that violates the policy is saved but **suspended**.
+- **Advanced connector policies** (an allow list, with everything blocked by default) are the evolution of the model. For now, they only cover certified connectors.
 
-### 7.5 Ocultar datos en el historial
+### 7.5 Hiding data in run history
 
-El historial de ejecuciones guarda **entradas y salidas de cada acción durante 30 días**. Lo puede ver cualquier propietario o copropietario del flujo. En salud:
+Run history stores **inputs and outputs for every action for 30 days**. Any flow owner or co-owner can view it. In healthcare:
 
-- Active **Secure inputs** y **Secure outputs** (Configuración → Seguridad) en la consulta DAX, la exportación, *Select* y el envío de correo ([Secure data used in cloud flows](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-secure-inputs-outputs-triggers)).
-- No escriba secretos en el flujo. Use **Azure Key Vault**, con variables de entorno de tipo secreto o con el conector (Premium).
-- **[inferido, basado en Logic Apps]** Algunas acciones integradas (*Compose*, *Parse JSON*, variables) no tienen *Secure outputs*. Evite dejar datos sensibles en ellas o asegure la acción siguiente.
+- Enable **Secure inputs** and **Secure outputs** (Settings → Security) for the DAX query, export, *Select*, and email action ([Secure data used in cloud flows](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-secure-inputs-outputs-triggers)).
+- Do not put secrets in the flow. Use **Azure Key Vault**, secret-type environment variables, or the connector (Premium).
+- **[Inferred, based on Logic Apps]** Some built-in actions (*Compose*, *Parse JSON*, variables) do not have *Secure outputs*. Avoid leaving sensitive data in them or secure the next action.
 
-### 7.6 Datos de salud y cumplimiento
+### 7.6 Healthcare data and compliance
 
-- Power Automate, Power BI y Exchange Online están dentro del **HIPAA Business Associate Agreement** de Microsoft, incluido por defecto en los términos de los servicios en línea, y tienen certificación **HITRUST CSF**. Microsoft aclara que el BAA **no** garantiza el cumplimiento por sí solo: la configuración y el uso son responsabilidad del cliente ([HIPAA/HITECH](https://learn.microsoft.com/compliance/regulatory/offering-hipaa-hitech)).
-- **Fuera de EE. UU. [inferido]:** aplique la ley local de protección de datos. En Argentina, la Ley 25.326 clasifica los datos de salud como **datos sensibles**. Confirme el encuadre con el área legal o de cumplimiento.
-- Prácticas mínimas para el contenido del correo **[inferido]:**
-  1. Enviar **indicadores agregados**, nunca nombres, documentos ni diagnósticos de pacientes.
-  2. Si un destinatario necesita detalle, enviar un **enlace al reporte**, que respeta permisos y RLS, en lugar del dato.
-  3. Usar RLS (`impersonatedUserName` o *Identities*) para que cada sede o servicio reciba solo lo suyo.
-  4. Aplicar **etiquetas de confidencialidad** de Microsoft Purview al correo. Recuerde que el PNG no hereda la etiqueta del reporte.
-  5. Revisar quién tiene acceso al flujo, porque el historial guarda los datos (§7.5).
+- Power Automate, Power BI, and Exchange Online are covered by Microsoft's **HIPAA Business Associate Agreement**, included by default in the online services terms, and have **HITRUST CSF** certification. Microsoft clarifies that the BAA **does not** guarantee compliance on its own: configuration and use are the customer's responsibility ([HIPAA/HITECH](https://learn.microsoft.com/compliance/regulatory/offering-hipaa-hitech)).
+- **Outside the U.S. [inferred]:** apply local data-protection law. In Argentina, Law 25,326 classifies health data as **sensitive data**. Confirm the applicable requirements with Legal or Compliance.
+- Minimum practices for email content **[inferred]:**
+  1. Send **aggregated metrics**, never patient names, identification numbers, or diagnoses.
+  2. If a recipient needs details, send a **link to the report**, which respects permissions and RLS, rather than the data itself.
+  3. Use RLS (`impersonatedUserName` or *Identities*) so each location or service receives only its own data.
+  4. Apply Microsoft Purview **sensitivity labels** to the email. Remember that the PNG does not inherit the report's label.
+  5. Review who has access to the flow, because run history stores the data (§7.5).
 
-### 7.7 Monitoreo
+### 7.7 Monitoring
 
-- La **analítica** del flujo y el **centro de automatización** (*Automation center*) muestran ejecuciones y errores.
-- El **CoE Starter Kit** sirve para el inventario de flujos huérfanos, conectores en uso y cumplimiento ([CoE tenant hygiene](https://learn.microsoft.com/power-platform/guidance/coe/after-setup-tenant-hygiene)).
-
----
-
-## 8. Cuándo basta una suscripción nativa de Power BI
-
-Fuente: [Email subscriptions](https://learn.microsoft.com/power-bi/collaborate-share/end-user-subscribe).
-
-Conviene una suscripción nativa si el envío es fijo, a destinatarios internos y sin lógica. Cambie a Power Automate cuando choque con alguno de estos límites:
-
-- **24 suscripciones** por reporte o dashboard (los reportes paginados no tienen este límite).
-- **Destinatarios externos** solo desde workspaces con capacidad paga (no PPU ni prueba).
-- **60 minutos** como máximo de ejecución.
-- Con **RLS**, el contenido refleja los permisos de quien crea la suscripción. Riesgo de exponer datos.
-- **Visuales no admitidos:** visuales personalizados no certificados, ArcGIS, Power Apps, Power Automate, visual de reporte paginado y Visio.
-- **Suscripciones dinámicas por destinatario** (reportes paginados): máximo 1.000 destinatarios y 10 minutos.
-- En el cambio de horario de verano pueden llegar correos duplicados.
+- Flow **analytics** and the **Automation center** show runs and errors.
+- The **CoE Starter Kit** can inventory orphaned flows, connectors in use, and compliance ([CoE tenant hygiene](https://learn.microsoft.com/power-platform/guidance/coe/after-setup-tenant-hygiene)).
 
 ---
 
-## 9. Checklist de puesta en producción
+## 8. When a native Power BI subscription is enough
 
-1. [ ] Patrón elegido por reporte (§1) y datos limitados a indicadores agregados (§7.6)
-2. [ ] Entorno dedicado de producción, Managed Environment y política DLP aplicada (§7.1, §7.4)
-3. [ ] Flujo dentro de una solución, con *connection references* y variables de entorno (§7.2)
-4. [ ] Cuenta de servicio como propietaria, grupo como copropietario y permisos de Power BI verificados (§7.3)
-5. [ ] Tenant de Power BI: *Dataset Execute Queries REST API* (para DAX) y *Export reports as image files* (para PNG) activados
-6. [ ] *Recurrence* con zona horaria y hora de inicio, programado después de la actualización del modelo (§4)
-7. [ ] Try/Catch, reintentos exponenciales, validación de filas y aviso con enlace a la ejecución (§6)
-8. [ ] *Secure inputs/outputs* en las acciones con datos (§7.5)
-9. [ ] Envío desde un buzón compartido y prueba en Outlook clásico, nuevo Outlook, web y móvil (guía PNG, §4)
-10. [ ] Consumo de solicitudes estimado frente a la licencia y al throttling de los conectores (§5)
+Source: [Email subscriptions](https://learn.microsoft.com/power-bi/collaborate-share/end-user-subscribe).
+
+A native subscription is a good fit when the email is fixed, goes to internal recipients, and needs no logic. Switch to Power Automate when you encounter one of these limits:
+
+- **24 subscriptions** per report or dashboard (paginated reports do not have this limit).
+- **External recipients** are supported only from workspaces with paid capacity (not PPU or trial).
+- Maximum execution time of **60 minutes**.
+- With **RLS**, the content reflects the subscription creator's permissions. This can expose data.
+- **Unsupported visuals:** uncertified custom visuals, ArcGIS, Power Apps, Power Automate, paginated report visual, and Visio.
+- **Dynamic per-recipient subscriptions** (paginated reports): maximum 1,000 recipients and 10 minutes.
+- Duplicate emails may arrive when daylight saving time changes.
 
 ---
 
-## Fuentes (Microsoft Learn)
+## 9. Production readiness checklist
+
+1. [ ] Pattern selected for each report (§1), with data limited to aggregated metrics (§7.6)
+2. [ ] Dedicated production environment, Managed Environment, and DLP policy applied (§7.1, §7.4)
+3. [ ] Flow is inside a solution, with *connection references* and environment variables (§7.2)
+4. [ ] Service account is the owner, a group is a co-owner, and Power BI permissions are verified (§7.3)
+5. [ ] Power BI tenant settings enabled: *Dataset Execute Queries REST API* (for DAX) and *Export reports as image files* (for PNG)
+6. [ ] *Recurrence* has a time zone and start time, and is scheduled after the model refresh (§4)
+7. [ ] Try/Catch, exponential retries, row validation, and notification with a run link are configured (§6)
+8. [ ] *Secure inputs/outputs* enabled on actions containing data (§7.5)
+9. [ ] Email sent from a shared mailbox; tested in classic Outlook, new Outlook, Outlook on the web, and mobile (PNG guide, §4)
+10. [ ] Request usage estimated against the license and connector throttling limits (§5)
+
+---
+
+## Sources (Microsoft Learn)
 
 **Power Automate**
 - Limits of automated, scheduled, and instant flows: https://learn.microsoft.com/power-automate/limits-and-config
-- Requests limits and allocations: https://learn.microsoft.com/power-platform/admin/api-request-limits-allocations
+- Request limits and allocations: https://learn.microsoft.com/power-platform/admin/api-request-limits-allocations
 - Power Automate licensing FAQ: https://learn.microsoft.com/power-platform/admin/power-automate-licensing/faqs
 - Understand platform limits and avoid throttling: https://learn.microsoft.com/power-automate/guidance/coding-guidelines/understand-limits
 - Run a cloud flow on a schedule: https://learn.microsoft.com/power-automate/run-scheduled-tasks
@@ -318,11 +318,11 @@ Conviene una suscripción nativa si el envío es fijo, a destinatarios internos 
 - Employ robust error handling: https://learn.microsoft.com/power-automate/guidance/coding-guidelines/error-handling
 - Secure data used in cloud flows: https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-secure-inputs-outputs-triggers
 - Create environment variables: https://learn.microsoft.com/power-automate/environment-variables
-- Environment variables in solution cloud flows (limitaciones): https://learn.microsoft.com/power-apps/maker/data-platform/environmentvariables-power-automate
+- Environment variables in solution cloud flows (limitations): https://learn.microsoft.com/power-apps/maker/data-platform/environmentvariables-power-automate
 - Pre-populate connection references and environment variables: https://learn.microsoft.com/power-platform/alm/conn-ref-env-variables-build-tools
 
 **Power BI**
-- Conector Power BI: https://learn.microsoft.com/connectors/powerbi/
+- Power BI connector: https://learn.microsoft.com/connectors/powerbi/
 - Datasets - Execute Queries (REST): https://learn.microsoft.com/rest/api/power-bi/datasets/execute-queries
 - Best practices for the Execute DAX Queries REST API: https://learn.microsoft.com/power-bi/developer/execute-dax-queries-arrow/best-practices
 - Data refresh in Power BI: https://learn.microsoft.com/power-bi/connect-data/refresh-data
@@ -331,7 +331,7 @@ Conviene una suscripción nativa si el envío es fijo, a destinatarios internos 
 - Email subscriptions: https://learn.microsoft.com/power-bi/collaborate-share/end-user-subscribe
 - Dynamic per recipient subscriptions: https://learn.microsoft.com/power-bi/collaborate-share/dynamic-subscriptions
 
-**Gobierno y cumplimiento**
+**Governance and compliance**
 - Implement a data policy strategy: https://learn.microsoft.com/power-platform/guidance/adoption/dlp-strategy
 - Connector classification: https://learn.microsoft.com/power-platform/admin/dlp-connector-classification
 - Impact of data policies on apps and flows: https://learn.microsoft.com/power-platform/admin/dlp-impact-policies-apps-flows
